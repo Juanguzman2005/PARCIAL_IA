@@ -1,0 +1,15 @@
+{
+  "n_centers": 4,
+  "error_opt": 0.1,
+  "meta": {
+    "X_cols": [
+      "Frecuencia_Respiratoria_rpm",
+      "Saturacion_Oxigeno_%",
+      "Frecuencia_Cardiaca_lpm",
+      "Temperatura_Corporal_C"
+    ],
+    "Y_cols": [
+      "Flujo_Espiratorio_Ls"
+    ]
+  }
+}

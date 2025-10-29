@@ -1,0 +1,32 @@
+[
+    {
+        "name": "simulacion1",
+        "csv": "simulacion1.csv",
+        "metrics": "simulacion1_metrics.json",
+        "saved_at": "2025-10-26T14:40:04.477977"
+    },
+    {
+        "name": "simulacion2",
+        "csv": "simulacion2.csv",
+        "metrics": "simulacion2_metrics.json",
+        "saved_at": "2025-10-26T15:08:38.271569"
+    },
+    {
+        "name": "simulacion3",
+        "csv": "simulacion3.csv",
+        "metrics": "simulacion3_metrics.json",
+        "saved_at": "2025-10-27T09:14:10.270292"
+    },
+    {
+        "name": "simulacion4",
+        "csv": "simulacion4.csv",
+        "metrics": "simulacion4_metrics.json",
+        "saved_at": "2025-10-27T21:58:23.148669"
+    },
+    {
+        "name": "PRUEBA",
+        "csv": "PRUEBA.csv",
+        "metrics": "PRUEBA_metrics.json",
+        "saved_at": "2025-10-29T11:09:07.513227"
+    }
+]

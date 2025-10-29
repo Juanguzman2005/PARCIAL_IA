@@ -1,0 +1,16 @@
+[
+    {
+        "Conjunto": "Entrenamiento",
+        "EG": "1.024845",
+        "MAE": "1.024845",
+        "RMSE": "1.199121",
+        "Convergencia": "No"
+    },
+    {
+        "Conjunto": "Simulación",
+        "EG": "1.354533",
+        "MAE": "1.354533",
+        "RMSE": "1.490367",
+        "Convergencia": "No"
+    }
+]
