@@ -1017,9 +1017,11 @@ class RBFApp(tk.Tk):
 
 
     def _build_tab_plots(self):
-        f = self.tab_plots
-        ttk.Button(f, text="Generar Gráficas", command=self.generate_plots).pack(anchor="nw", padx=6, pady=6)
-        ttk.Button(f, text="Guardar Gráficas", command=self.save_plots).pack(anchor="nw", padx=6)
+     f = self.tab_plots
+     ttk.Button(f, text="Generar Gráficas", command=self.generate_plots).pack(anchor="nw", padx=6, pady=6)
+     ttk.Button(f, text="Guardar Gráficas", command=self.save_plots).pack(anchor="nw", padx=6)
+     ttk.Button(f, text="Cargar Gráfica", command=self.load_plot).pack(anchor="nw", padx=6, pady=6)
+
 
     def generate_plots(self):
         if self.weights is None or self.centers is None:
@@ -1194,6 +1196,44 @@ class RBFApp(tk.Tk):
         except Exception as e:
             self.log(f"Error al guardar gráficas: {e}")
             messagebox.showerror("Error", f"No se pudieron guardar las gráficas:\n{e}")
+
+    def load_plot(self):
+     """Permite al usuario cargar y visualizar una gráfica guardada localmente."""
+     from PIL import Image, ImageTk
+
+     file_path = filedialog.askopenfilename(
+        title="Selecciona la gráfica a cargar",
+        filetypes=[("Imágenes", "*.png *.jpg *.jpeg *.bmp *.gif"), ("PDF", "*.pdf"), ("Todos los archivos", "*.*")]
+     )
+
+     if not file_path:
+        return
+
+     try:
+        if file_path.lower().endswith(".pdf"):
+            messagebox.showinfo("PDF detectado", "El archivo es un PDF, se abrirá con el visor predeterminado.")
+            os.startfile(file_path)  # Abre el PDF con el programa predeterminado del sistema
+            return
+
+        # Si es una imagen, mostrarla en una nueva ventana
+        img = Image.open(file_path)
+        win = tk.Toplevel(self)
+        win.title(f"Vista de Gráfica: {os.path.basename(file_path)}")
+
+        # Redimensionar la imagen si es muy grande
+        img.thumbnail((1000, 700))
+        img_tk = ImageTk.PhotoImage(img)
+        lbl = tk.Label(win, image=img_tk)
+        lbl.image = img_tk  # mantener referencia
+        lbl.pack()
+
+        ttk.Button(win, text="Cerrar", command=win.destroy).pack(pady=10)
+        self.log(f"Gráfica cargada y mostrada desde {file_path}")
+
+     except Exception as e:
+        messagebox.showerror("Error", f"No se pudo cargar la gráfica:\n{e}")
+        self.log(f"❌ Error cargando gráfica: {e}")
+
 
 
     def reset_all(self):
