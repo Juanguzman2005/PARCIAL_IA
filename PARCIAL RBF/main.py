@@ -31,7 +31,7 @@ class RBFApp(tk.Tk):
         self.seed = 42
         self.meta = {}
         self._build_ui()
-
+        
     def _build_ui(self):
         nb = ttk.Notebook(self)
         nb.pack(fill="both", expand=True)
@@ -1024,82 +1024,100 @@ class RBFApp(tk.Tk):
 
 
     def generate_plots(self):
-        if self.weights is None or self.centers is None:
-            messagebox.showwarning("Sin modelo", "Entrena o carga un modelo primero.")
-            return
-        if self.X_train is None or self.Y_train is None:
-            messagebox.showwarning("Sin datos", "No hay datos de entrenamiento cargados.")
-            return
+     if self.weights is None or self.centers is None:
+        messagebox.showwarning("Sin modelo", "Entrena o carga un modelo primero.")
+        return
+     if self.X_train is None or self.Y_train is None:
+        messagebox.showwarning("Sin datos", "No hay datos de entrenamiento cargados.")
+        return
+     if self.X_sim is None or self.Y_sim is None:
+        messagebox.showwarning("Sin datos", "No hay datos de simulación cargados.")
+        return
 
-        # --- FUNCIONES RBF SEGÚN FORMULAS DEL PROFESOR ---
-        def compute_phi(X, centers):
-            Phi = np.zeros((X.shape[0], centers.shape[0]))
-            for p in range(X.shape[0]):
-                for j in range(centers.shape[0]):
-                    Dpj = np.linalg.norm(X[p] - centers[j])
-                    if Dpj > 0:
-                        Phi[p, j] = (Dpj ** 2) * np.log(Dpj)
-                    else:
-                        Phi[p, j] = 0.0
-            return np.nan_to_num(Phi, nan=0.0)
+     # --- FUNCIONES RBF SEGÚN FORMULAS DEL PROFESOR ---
+     def compute_phi(X, centers):
+        Phi = np.zeros((X.shape[0], centers.shape[0]))
+        for p in range(X.shape[0]):
+            for j in range(centers.shape[0]):
+                Dpj = np.linalg.norm(X[p] - centers[j])
+                Phi[p, j] = (Dpj ** 2) * np.log(Dpj) if Dpj > 0 else 0.0
+        return np.nan_to_num(Phi, nan=0.0)
 
-        def build_A(Phi):
-            ones = np.ones((Phi.shape[0], 1))
-            return np.hstack([ones, Phi])
+     def build_A(Phi):
+        ones = np.ones((Phi.shape[0], 1))
+        return np.hstack([ones, Phi])
 
-        def predict(A, W):
-            return A @ W
+     def predict(A, W):
+        return A @ W
 
-        def calcular_metricas(Yd, Yr):
-            N = len(Yd)
-            errores = Yd - Yr
-            EG = np.sum(np.abs(errores)) / N
-            MAE = np.mean(np.abs(errores))
-            RMSE = np.sqrt(np.mean(errores ** 2))
-            return EG, MAE, RMSE, errores
+     def calcular_metricas(Yd, Yr):
+        N = len(Yd)
+        errores = Yd - Yr
+        EG = np.sum(np.abs(errores)) / N
+        MAE = np.mean(np.abs(errores))
+        RMSE = np.sqrt(np.mean(errores ** 2))
+        return EG, MAE, RMSE, errores
 
-        # --- Calcular datos del entrenamiento ---
-        Phi_train = compute_phi(self.X_train, self.centers)
-        A_train = build_A(Phi_train)
-        Yr_train = predict(A_train, self.weights)
-        Yd_train = self.Y_train
+     # --- Entrenamiento ---
+     Phi_train = compute_phi(self.X_train, self.centers)
+     A_train = build_A(Phi_train)
+     Yr_train = predict(A_train, self.weights)
+     Yd_train = self.Y_train
+     EG_t, MAE_t, RMSE_t, err_t = calcular_metricas(Yd_train, Yr_train)
 
-        EG, MAE, RMSE, errores = calcular_metricas(Yd_train, Yr_train)
-        patrones = np.arange(1, len(Yd_train) + 1)
+     # --- Simulación ---
+     Phi_sim = compute_phi(self.X_sim, self.centers)
+     A_sim = build_A(Phi_sim)
+     Yr_sim = predict(A_sim, self.weights)
+     Yd_sim = self.Y_sim
+     EG_s, MAE_s, RMSE_s, err_s = calcular_metricas(Yd_sim, Yr_sim)
 
-        # --- GRAFICAR ---
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        plt.subplots_adjust(wspace=0.3)
-        plt.suptitle("Gráficas del Entrenamiento RBF", fontsize=14)
+     # --- GRAFICAR ---
+     fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+     plt.subplots_adjust(wspace=0.3, hspace=0.4)
+     plt.suptitle("Comparación Entrenamiento vs Simulación RBF", fontsize=16)
 
-        # 🔹 1. YD vs YR
-        axes[0].plot(patrones, Yd_train, 'o-', label='YD (Deseado)')
-        axes[0].plot(patrones, Yr_train, 'x--', label='YR (Red)')
-        axes[0].set_title("YD vs YR (Entrenamiento)")
-        axes[0].set_xlabel("Patrón")
-        axes[0].set_ylabel("Valor de salida")
-        axes[0].legend()
-        axes[0].grid(True)
+     # === Fila 1: Entrenamiento ===
+     patrones_t = np.arange(1, len(Yd_train) + 1)
+     axes[0, 0].plot(patrones_t, Yd_train, 'o-', label='YD (Deseado)')
+     axes[0, 0].plot(patrones_t, Yr_train, 'x--', label='YR (Red)')
+     axes[0, 0].set_title("YD vs YR (Entrenamiento)")
+     axes[0, 0].set_xlabel("Patrón"); axes[0, 0].set_ylabel("Valor de salida")
+     axes[0, 0].legend(); axes[0, 0].grid(True)
 
-        # 🔹 2. EG vs Error óptimo
-        axes[1].plot([1], [EG], 'bo', markersize=8, label=f"EG = {EG:.4f}")
-        axes[1].axhline(y=float(self.error_opt.get()), color='r', linestyle='--', label=f"Error óptimo = {float(self.error_opt.get())}")
-        axes[1].set_title("EG vs Error óptimo (Entrenamiento)")
-        axes[1].set_xlabel("Iteración 1")
-        axes[1].set_ylabel("Error")
-        axes[1].legend()
-        axes[1].grid(True)
+     axes[0, 1].plot([1], [EG_t], 'bo', label=f"EG = {EG_t:.4f}")
+     axes[0, 1].axhline(y=float(self.error_opt.get()), color='r', linestyle='--', label=f"Error óptimo = {float(self.error_opt.get())}")
+     axes[0, 1].set_title("EG vs Error óptimo (Entrenamiento)")
+     axes[0, 1].legend(); axes[0, 1].grid(True)
 
-        # 🔹 3. Error por patrón
-        axes[2].bar(patrones, np.abs(errores).flatten())
-        axes[2].set_title("Error por Patrón (Entrenamiento)")
-        axes[2].set_xlabel("Patrón")
-        axes[2].set_ylabel("|YD - YR|")
-        axes[2].grid(axis="y")
+     axes[0, 2].bar(patrones_t, np.abs(err_t).flatten())
+     axes[0, 2].set_title("Error por Patrón (Entrenamiento)")
+     axes[0, 2].set_xlabel("Patrón"); axes[0, 2].set_ylabel("|YD - YR|")
+     axes[0, 2].grid(axis="y")
 
-        plt.show()
+     # === Fila 2: Simulación ===
+     patrones_s = np.arange(1, len(Yd_sim) + 1)
+     axes[1, 0].plot(patrones_s, Yd_sim, 'o-', label='YD (Deseado)')
+     axes[1, 0].plot(patrones_s, Yr_sim, 'x--', label='YR (Red)')
+     axes[1, 0].set_title("YD vs YR (Simulación)")
+     axes[1, 0].set_xlabel("Patrón"); axes[1, 0].set_ylabel("Valor de salida")
+     axes[1, 0].legend(); axes[1, 0].grid(True)
 
-        self.log(f"Gráficas generadas correctamente. EG={EG:.6f}, MAE={MAE:.6f}, RMSE={RMSE:.6f}")
+     axes[1, 1].plot([1], [EG_s], 'go', label=f"EG = {EG_s:.4f}")
+     axes[1, 1].axhline(y=float(self.error_opt.get()), color='r', linestyle='--', label=f"Error óptimo = {float(self.error_opt.get())}")
+     axes[1, 1].set_title("EG vs Error óptimo (Simulación)")
+     axes[1, 1].legend(); axes[1, 1].grid(True)
+
+     axes[1, 2].bar(patrones_s, np.abs(err_s).flatten(), color='orange')
+     axes[1, 2].set_title("Error por Patrón (Simulación)")
+     axes[1, 2].set_xlabel("Patrón"); axes[1, 2].set_ylabel("|YD - YR|")
+     axes[1, 2].grid(axis="y")
+
+     plt.show()
+
+     self.log(f"Gráficas generadas. Entrenamiento: EG={EG_t:.6f}, MAE={MAE_t:.6f}, RMSE={RMSE_t:.6f} | "
+             f"Simulación: EG={EG_s:.6f}, MAE={MAE_s:.6f}, RMSE={RMSE_s:.6f}")
+
 
     def save_plots(self):
         if self.weights is None or self.centers is None:

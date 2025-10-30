@@ -4,5 +4,11 @@
         "csv": "Prueba1.csv",
         "metrics": "Prueba1_metrics.json",
         "saved_at": "2025-10-30T00:59:26.762562"
+    },
+    {
+        "name": "Prueba2",
+        "csv": "Prueba2.csv",
+        "metrics": "Prueba2_metrics.json",
+        "saved_at": "2025-10-30T12:38:46.126677"
     }
 ]

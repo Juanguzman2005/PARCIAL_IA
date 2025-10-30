@@ -1,0 +1,16 @@
+{
+    "nombre": "Prueba2",
+    "n_centers": 3,
+    "error_opt": 0.1,
+    "meta": {
+        "X_cols": [
+            "Peso_kg",
+            "Edad_meses",
+            "Consumo_Concentrado_kg"
+        ],
+        "Y_cols": [
+            "Produccion_Leche_LitrosDia"
+        ]
+    },
+    "fecha_guardado": "2025-10-30T12:37:57.411307"
+}
