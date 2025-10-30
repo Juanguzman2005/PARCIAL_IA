@@ -1,0 +1,17 @@
+{
+    "nombre": "Prueba1",
+    "n_centers": 5,
+    "error_opt": 0.1,
+    "meta": {
+        "X_cols": [
+            "Temperatura_Suelo_C",
+            "Humedad_Suelo_%",
+            "PH_Suelo",
+            "Luminosidad_Lux"
+        ],
+        "Y_cols": [
+            "Humedad_Ambiente_%"
+        ]
+    },
+    "fecha_guardado": "2025-10-30T01:08:11.098278"
+}

@@ -61,18 +61,31 @@ class RBFApp(tk.Tk):
             print(text)
 
     def _build_tab_data(self):
-        f = self.tab_data
-        btn_row = ttk.Frame(f); btn_row.pack(fill="x", padx=6, pady=6)
-        ttk.Button(btn_row, text="Limpiar Todo", command=self.reset_all).grid(row=0,column=3,padx=4)
-        ttk.Button(btn_row, text="Cargar Dataset (CSV Local)", command=self.load_dataset_local).grid(row=0,column=0,padx=4)
-        ttk.Button(btn_row, text="Cargar Dataset (URL/Drive)", command=self.load_dataset_url).grid(row=0,column=1,padx=4)
-        ttk.Button(btn_row, text="Agregar datos", command=self.add_data_dialog).grid(row=0,column=2,padx=4)
-        self.dataset_status_lbl = ttk.Label(f, text="Dataset: No cargado"); self.dataset_status_lbl.pack(anchor="w", padx=6)
-        self.dataset_info_lbl = ttk.Label(f, text="Entradas: 0 | Salidas: 0 | Patrones: 0"); self.dataset_info_lbl.pack(anchor="w", padx=6)
-        pv = ttk.Labelframe(f, text="Vista Previa (Train 70% - Sim 30%)"); pv.pack(fill="both", expand=True, padx=6, pady=6)
-        self.tv_train = ttk.Treeview(pv, show="headings"); self.tv_sim = ttk.Treeview(pv, show="headings")
-        self.tv_train.pack(side="left", fill="both", expand=True); self.tv_sim.pack(side="left", fill="both", expand=True)
-        self.log_text = tk.Text(f, height=6, state="disabled"); self.log_text.pack(fill="x", padx=6, pady=6)
+     f = self.tab_data
+     btn_row = ttk.Frame(f); btn_row.pack(fill="x", padx=6, pady=6)
+     ttk.Button(btn_row, text="Limpiar Todo", command=self.reset_all).grid(row=0,column=3,padx=4)
+     ttk.Button(btn_row, text="Cargar Dataset (CSV Local)", command=self.load_dataset_local).grid(row=0,column=0,padx=4)
+     ttk.Button(btn_row, text="Cargar Dataset (URL/Drive)", command=self.load_dataset_url).grid(row=0,column=1,padx=4)
+     ttk.Button(btn_row, text="Agregar datos", command=self.add_data_dialog).grid(row=0,column=2,padx=4)
+
+     # === Campos para porcentaje de entrenamiento y simulación ===
+     perc_frame = ttk.Frame(f); perc_frame.pack(fill="x", padx=6, pady=4)
+     ttk.Label(perc_frame, text="Porcentaje Entrenamiento (%):").grid(row=0, column=0, sticky="w", padx=5)
+     self.entry_train_percent = ttk.Entry(perc_frame, width=6)
+     self.entry_train_percent.insert(0, "70")
+     self.entry_train_percent.grid(row=0, column=1, padx=5)
+     ttk.Label(perc_frame, text="Porcentaje Simulación (%):").grid(row=0, column=2, sticky="w", padx=5)
+     self.entry_test_percent = ttk.Entry(perc_frame, width=6)
+     self.entry_test_percent.insert(0, "30")
+     self.entry_test_percent.grid(row=0, column=3, padx=5)
+
+     self.dataset_status_lbl = ttk.Label(f, text="Dataset: No cargado"); self.dataset_status_lbl.pack(anchor="w", padx=6)
+     self.dataset_info_lbl = ttk.Label(f, text="Entradas: 0 | Salidas: 0 | Patrones: 0"); self.dataset_info_lbl.pack(anchor="w", padx=6)
+     pv = ttk.Labelframe(f, text="Vista Previa (Entrenamiento / Simulación)"); pv.pack(fill="both", expand=True, padx=6, pady=6)
+     self.tv_train = ttk.Treeview(pv, show="headings"); self.tv_sim = ttk.Treeview(pv, show="headings")
+     self.tv_train.pack(side="left", fill="both", expand=True); self.tv_sim.pack(side="left", fill="both", expand=True)
+     self.log_text = tk.Text(f, height=6, state="disabled"); self.log_text.pack(fill="x", padx=6, pady=6)
+
 
     def load_dataset_local(self):
      path = filedialog.askopenfilename(filetypes=[("CSV","*.csv"),("All","*.*")])
@@ -86,13 +99,33 @@ class RBFApp(tk.Tk):
 
 
     def load_dataset_url(self):
-        url = simpledialog.askstring("URL", "Pega la URL pública del CSV (Drive o web):")
-        if not url: return
-        try:
-            df = drive_loader.load_csv_from_url(url)
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo leer desde URL: {e}"); return
-        self._process_loaded_df(df); self.log(f"Dataset cargado desde URL")
+     url = simpledialog.askstring("URL", "Pega la URL pública del CSV (Drive o web):")
+     if not url:
+        return
+
+     try:
+        # --- Si es un enlace de Google Drive ---
+        if "drive.google.com" in url:
+            import re
+            # Extraer el ID del archivo (lo que está entre /d/ y /view)
+            match = re.search(r"/d/([a-zA-Z0-9_-]+)", url)
+            if match:
+                file_id = match.group(1)
+                # Convertir a enlace descargable directo
+                url = f"https://drive.google.com/uc?export=download&id={file_id}"
+            else:
+                messagebox.showerror("Error", "No se pudo identificar el ID del archivo en el enlace de Drive.")
+                return
+
+        # --- Leer CSV desde la URL ---
+        df = pd.read_csv(url)
+        self._process_loaded_df(df, path=url)
+        self.log(f"Dataset cargado correctamente desde URL o Drive: {url}")
+
+     except Exception as e:
+        messagebox.showerror("Error", f"No se pudo leer desde la URL proporcionada:\n{e}")
+        self.log(f"Error cargando dataset desde URL: {e}")
+
 
     def add_data_dialog(self):
         if self.df_raw is None:
@@ -192,8 +225,19 @@ class RBFApp(tk.Tk):
      # escalar y dividir
      self.scaler = StandardScaler()
      Xs = self.scaler.fit_transform(X)
-     X_train, X_sim, Y_train, Y_sim = train_test_split(Xs, Y, test_size=0.3, random_state=self.seed, shuffle=True)
 
+     # ✅ Leer porcentajes del usuario y validar
+     try:
+          train_percent = float(self.entry_train_percent.get())
+          test_percent = float(self.entry_test_percent.get())
+          if abs(train_percent + test_percent - 100) > 0.001:
+              messagebox.showerror("Error", "La suma de los porcentajes de entrenamiento y simulación debe ser 100%.")
+              return
+          test_size = test_percent / 100
+     except Exception:
+         messagebox.showerror("Error", "Por favor ingresa valores válidos de porcentaje.")
+         return
+     X_train, X_sim, Y_train, Y_sim = train_test_split(Xs, Y, test_size=test_size, random_state=self.seed, shuffle=True)
      # guardar en estado
      self.X = Xs; self.Y = Y
      self.X_train = X_train; self.X_sim = X_sim; self.Y_train = Y_train; self.Y_sim = Y_sim
@@ -277,17 +321,34 @@ class RBFApp(tk.Tk):
         self.tv_centers = ttk.Treeview(f, show="headings"); self.tv_centers.pack(fill="both",expand=True,padx=6,pady=6)
 
     def validate_config(self):
-        if self.X_train is None: messagebox.showwarning("Sin dataset","Carga dataset"); return False
-        try:
-            n = int(self.n_centers.get())
-        except Exception:
-            messagebox.showerror("Error","ncentros inválido"); return False
-        if n < self.X_train.shape[1]:
-            messagebox.showerror("Validación",f"n_centros ({n}) debe ser >= n_entradas ({self.X_train.shape[1]})"); return False
-        eo=float(self.error_opt.get())
-        if not (0.0 <= eo <= 0.1):
-            messagebox.showerror("Validación","Error óptimo fuera del rango 0-0.1"); return False
-        return True
+     if self.X_train is None:
+        messagebox.showwarning("Sin dataset", "Carga un dataset antes de continuar.")
+        return False
+     try:
+        n = int(self.n_centers.get())
+        if n <= 0:
+            messagebox.showerror("Error", "El número de centros debe ser un entero positivo.")
+            return False
+     except Exception:
+        messagebox.showerror("Error", "Número de centros inválido.")
+        return False
+
+     try:
+        eo = float(self.error_opt.get())
+     except Exception:
+        messagebox.showerror("Error", "Error óptimo inválido.")
+        return False
+
+     if not (0.0 <= eo <= 0.1):
+        messagebox.showerror("Validación", "El error óptimo debe estar entre 0.0 y 0.1.")
+        return False
+
+     # ✅ Eliminamos la restricción que exigía n_centers >= n_entradas
+     # porque los centros radiales no dependen de cuántas entradas haya.
+
+     self.log(f"Configuración validada: n_centros={n}, error_opt={eo}")
+     return True
+
 
     def init_centers(self, aleatorio=True):
         if not self.validate_config(): return
@@ -451,14 +512,24 @@ class RBFApp(tk.Tk):
         self.log(f"Error cargando modelo: {e}")
 
     def _build_tab_train(self):
-        f=self.tab_train; btnf=ttk.Frame(f); btnf.pack(fill="x")
-        ttk.Button(btnf, text="Iniciar Entrenamiento", command=self.start_training).pack(side="left", padx=6, pady=6)
-        ttk.Button(btnf, text="Editar centros", command=self.edit_centers).pack(side="left", padx=6)
-        self.train_state_lbl = ttk.Label(btnf, text="Estado: No iniciado"); self.train_state_lbl.pack(side="left", padx=12)
-        self.tv_train_results = ttk.Treeview(f, columns=("Iter","EG","Ncent"), show="headings"); 
-        for c in ("Iter","EG","Ncent"): self.tv_train_results.heading(c,text=c); self.tv_train_results.column(c,width=120)
-        self.tv_train_results.pack(fill="x", padx=6, pady=6)
-        self.tv_weights = ttk.Treeview(f, show="headings"); self.tv_weights.pack(fill="both", expand=True, padx=6, pady=6)
+     f = self.tab_train
+     btnf = ttk.Frame(f)
+     btnf.pack(fill="x")
+
+     ttk.Button(btnf, text="Iniciar Entrenamiento", command=self.start_training).pack(side="left", padx=6, pady=6)
+     ttk.Button(btnf, text="Editar centros", command=self.edit_centers).pack(side="left", padx=6)
+     ttk.Button(btnf, text="Guardar pesos y umbral", command=self.guardar_pesos_umbral).pack(side="left", padx=6)
+     self.train_state_lbl = ttk.Label(btnf, text="Estado: No iniciado")
+     self.train_state_lbl.pack(side="left", padx=12)
+
+     self.tv_train_results = ttk.Treeview(f, columns=("Iter", "EG", "Ncent"), show="headings")
+     for c in ("Iter", "EG", "Ncent"):
+        self.tv_train_results.heading(c, text=c)
+        self.tv_train_results.column(c, width=120)
+     self.tv_train_results.pack(fill="x", padx=6, pady=6)
+     self.tv_weights = ttk.Treeview(f, show="headings")
+     self.tv_weights.pack(fill="both", expand=True, padx=6, pady=6)
+
 
     def edit_centers(self):
         if self.centers is None: messagebox.showwarning("No centros","Inicializa primero"); return
@@ -472,37 +543,140 @@ class RBFApp(tk.Tk):
         self.centers=arr; self._populate_centers_tree(); self.log("Centros editados.")
 
     def start_training(self):
-        if self.X_train is None: messagebox.showwarning("No dataset","Carga dataset"); return
-        if not self.validate_config(): return
-        if self.centers is None: messagebox.showwarning("No centros","Inicializa centros"); return
-        self.train_state_lbl.config(text="Estado: En curso"); self.log("Entrenamiento iniciado")
-        Phi = rbf_core.compute_phi(self.X_train, self.centers); A = rbf_core.build_A(Phi)
-        W = rbf_core.solve_weights(A, self.Y_train); self.weights = W
-        Yr = rbf_core.predict(A, W); met = metrics_mod.metrics(self.Y_train, Yr)
-        for r in self.tv_train_results.get_children(): self.tv_train_results.delete(r)
-        self.tv_train_results.insert("", "end", values=(1, f"{met['EG']:.6f}", int(self.n_centers.get())))
-        for r in self.tv_weights.get_children(): self.tv_weights.delete(r)
-        self.tv_weights["columns"] = ("Param","Value")
-        self.tv_weights.heading("Param",text="Param"); self.tv_weights.heading("Value",text="Value")
-        for i in range(self.weights.shape[0]):
-            name = "W0" if i==0 else f"W{i}"; val = float(self.weights[i,0]) if self.weights.ndim>1 else float(self.weights[i])
-            self.tv_weights.insert("", "end", values=(name, f"{val:.6f}"))
-        for idx,c in enumerate(self.centers, start=1):
-            self.tv_weights.insert("", "end", values=(f"Center {idx}", ", ".join([f"{float(v):.6f}" for v in c])))
-        self.train_state_lbl.config(text="Estado: Finalizado"); self.log(f"Entrenamiento finalizado (EG={met['EG']:.6f})")
+     if self.X_train is None:
+        messagebox.showwarning("No dataset", "Carga dataset")
+        return
+     if not self.validate_config():
+        return
+     if self.centers is None:
+        messagebox.showwarning("No centros", "Inicializa centros")
+        return
+
+     self.train_state_lbl.config(text="Estado: En curso")
+     self.log("Entrenamiento iniciado")
+
+     # --- FUNCIONES RBF SEGÚN FORMULAS DEL PROFESOR ---
+     def compute_phi(X, centers):
+        Phi = np.zeros((X.shape[0], centers.shape[0]))
+        for p in range(X.shape[0]):
+            for j in range(centers.shape[0]):
+                Dpj = np.linalg.norm(X[p] - centers[j])
+                Phi[p, j] = (Dpj ** 2) * np.log(Dpj) if Dpj > 0 else 0.0
+        return np.nan_to_num(Phi, nan=0.0)
+
+     Phi = compute_phi(self.X_train, self.centers)
+     A = np.hstack([np.ones((Phi.shape[0], 1)), Phi])
+     W = np.linalg.pinv(A.T @ A) @ A.T @ self.Y_train
+     self.weights = W
+
+     Yr = A @ W
+     EG = np.mean(np.abs(self.Y_train - Yr))
+     MAE = np.mean(np.abs(self.Y_train - Yr))
+     RMSE = np.sqrt(np.mean((self.Y_train - Yr)**2))
+
+     self.train_state_lbl.config(text="Estado: Finalizado")
+     self.log(f"Entrenamiento finalizado. EG={EG:.6f}, MAE={MAE:.6f}, RMSE={RMSE:.6f}")
+
+     self.tv_train_results.delete(*self.tv_train_results.get_children())
+     self.tv_train_results.insert("", "end", values=(1, f"{EG:.6f}", int(self.n_centers.get())))
+
+     self.tv_weights.delete(*self.tv_weights.get_children())
+     self.tv_weights["columns"] = ("Param", "Value")
+     for i in range(self.weights.shape[0]):
+        name = "W0" if i == 0 else f"W{i}"
+        val = float(self.weights[i, 0]) if self.weights.ndim > 1 else float(self.weights[i])
+        self.tv_weights.insert("", "end", values=(name, f"{val:.6f}"))
+     for idx, c in enumerate(self.centers, start=1):
+        self.tv_weights.insert("", "end", values=(f"C{idx}", ", ".join([f"{float(v):.6f}" for v in c])))
+
+     # ✅ Mostrar también los valores en la pestaña de simulación
+     self.update_sim_params_table()
+
+
+    def guardar_pesos_umbral(self):
+     """Permite al usuario guardar pesos, centros y umbral en archivos locales."""
+     import json
+
+     if self.centers is None or self.weights is None:
+        messagebox.showwarning("Sin modelo", "Debes entrenar antes de guardar.")
+        return
+
+     folder = filedialog.askdirectory(title="Selecciona carpeta donde guardar el modelo")
+     if not folder:
+        return
+
+     name = simpledialog.askstring("Nombre del modelo", "Asigna un nombre al modelo (sin espacios):")
+     if not name:
+        return
+
+     safe_name = "".join(c for c in name if c.isalnum() or c in ("_", "-")).strip()
+     model_dir = os.path.join(folder, safe_name)
+     os.makedirs(model_dir, exist_ok=True)
+
+     try:
+        np.save(os.path.join(model_dir, "centros.npy"), self.centers)
+        np.save(os.path.join(model_dir, "pesos.npy"), self.weights)
+
+        umbral = {"umbral": float(self.error_opt.get())}
+        with open(os.path.join(model_dir, "umbral.json"), "w", encoding="utf-8") as f:
+            json.dump(umbral, f, indent=4)
+
+        messagebox.showinfo("Guardado exitoso", f"Modelo guardado en:\n{model_dir}")
+        self.log(f"✅ Modelo guardado correctamente en {model_dir}")
+
+     except Exception as e:
+        messagebox.showerror("Error", f"No se pudo guardar el modelo:\n{e}")
+        self.log(f"❌ Error al guardar el modelo: {e}")
 
     def _build_tab_sim(self):
-        f=self.tab_sim; btnf=ttk.Frame(f); btnf.pack(fill="x")
-        ttk.Button(btnf, text="Ejecutar Simulación", command=self.run_sim).pack(side="left", padx=6, pady=6)
-        ttk.Button(btnf, text="Añadir Patrón de Prueba", command=self.add_sim_pattern).pack(side="left")
-        ttk.Button(btnf, text="Cargar datos simulados (local)", command=self.load_simulated_csv).pack(side="left", padx=6)
-        ttk.Button(btnf, text="Guardar datos simulados", command=self.save_simulated).pack(side="left", padx=6)
-        self.tv_sim_results = ttk.Treeview(f, columns=("Pat","YR","YD","Err"), show="headings")
-        for c in ("Pat","YR","YD","Err"): self.tv_sim_results.heading(c,text=c); self.tv_sim_results.column(c,width=120)
-        self.tv_sim_results.pack(fill="both", expand=True, padx=6, pady=6)
-        self.tv_metrics = ttk.Treeview(f, columns=("Conjunto","EG","MAE","RMSE","Convergencia"), show="headings")
-        for c in ("Conjunto","EG","MAE","RMSE","Convergencia"): self.tv_metrics.heading(c,text=c); self.tv_metrics.column(c,width=120)
-        self.tv_metrics.pack(fill="x", padx=6, pady=6)
+     f = self.tab_sim
+     btnf = ttk.Frame(f)
+     btnf.pack(fill="x")
+
+     # --- Botones principales ---
+     ttk.Button(btnf, text="Ejecutar Simulación", command=self.run_sim).pack(side="left", padx=6, pady=6)
+     ttk.Button(btnf, text="Añadir Patrón de Prueba", command=self.add_sim_pattern).pack(side="left")
+     ttk.Button(btnf, text="Cargar pesos y umbral", command=self.cargar_pesos_umbral).pack(side="left", padx=6)
+     ttk.Button(btnf, text="Guardar datos simulados", command=self.save_simulated).pack(side="left", padx=6)
+
+     # --- Tabla de resultados ---
+     self.tv_sim_results = ttk.Treeview(f, columns=("Pat", "YR", "YD", "Err"), show="headings")
+     for c in ("Pat", "YR", "YD", "Err"):
+        self.tv_sim_results.heading(c, text=c)
+        self.tv_sim_results.column(c, width=120)
+     self.tv_sim_results.pack(fill="both", expand=True, padx=6, pady=6)
+
+     # --- Tabla de métricas ---
+     self.tv_metrics = ttk.Treeview(f, columns=("Conjunto", "EG", "MAE", "RMSE", "Convergencia"), show="headings")
+     for c in ("Conjunto", "EG", "MAE", "RMSE", "Convergencia"):
+        self.tv_metrics.heading(c, text=c)
+        self.tv_metrics.column(c, width=120)
+     self.tv_metrics.pack(fill="x", padx=6, pady=6)
+
+     # --- Tabla para pesos, umbral y centros cargados ---
+     lf = ttk.Labelframe(f, text="Pesos, Umbral y Centros Cargados")
+     lf.pack(fill="x", padx=6, pady=6)
+     self.tv_loaded = ttk.Treeview(lf, columns=("Parametro", "Valor"), show="headings")
+     self.tv_loaded.heading("Parametro", text="Parámetro")
+     self.tv_loaded.heading("Valor", text="Valor")
+     self.tv_loaded.column("Parametro", width=150)
+     self.tv_loaded.column("Valor", width=300)
+     self.tv_loaded.pack(fill="x", padx=4, pady=4)
+
+    def update_sim_params_table(self):
+     """Actualiza la tabla de pesos/umbral/centros en simulación tras entrenamiento o carga local."""
+     for item in self.tv_loaded.get_children():
+        self.tv_loaded.delete(item)
+     if self.weights is None or self.centers is None:
+        return
+     # Mostrar umbral (W0), pesos y centros
+     self.tv_loaded.insert("", "end", values=("W0 (Umbral)", f"{self.error_opt.get():.6f}"))
+     for i in range(1, self.weights.shape[0]):
+        self.tv_loaded.insert("", "end", values=(f"W{i}", f"{float(self.weights[i, 0]):.6f}"))
+     for j, c in enumerate(self.centers, start=1):
+        c_str = ", ".join([f"{float(v):.6f}" for v in c])
+        self.tv_loaded.insert("", "end", values=(f"C{j}", c_str))
+
 
     def add_sim_pattern(self):
         if self.X_train is None:
@@ -524,39 +698,174 @@ class RBFApp(tk.Tk):
         self.log("Nuevo patrón agregado a simulación")
 
     def run_sim(self):
-        if self.centers is None or self.weights is None:
-            messagebox.showwarning("Sin modelo", "Primero entrena o carga un modelo guardado.")
-            return
-        if self.X_sim is None or self.Y_sim is None:
-            messagebox.showwarning("Sin datos", "No hay datos de simulación cargados.")
-            return
-        Phi_sim = rbf_core.compute_phi(self.X_sim, self.centers)
-        A_sim = rbf_core.build_A(Phi_sim)
-        Yr_sim = rbf_core.predict(A_sim, self.weights)
+     if self.centers is None or self.weights is None:
+        messagebox.showwarning("Sin modelo", "Entrena o carga un modelo primero.")
+        return
+     if self.X_sim is None or self.Y_sim is None:
+        messagebox.showwarning("Sin datos", "No hay datos de simulación cargados.")
+        return
 
-        met_sim = metrics_mod.metrics(self.Y_sim, Yr_sim)
-        Phi_train = rbf_core.compute_phi(self.X_train, self.centers)
-        A_train = rbf_core.build_A(Phi_train)
-        Yr_train = rbf_core.predict(A_train, self.weights)
-        met_train = metrics_mod.metrics(self.Y_train, Yr_train)
+     def compute_phi(X, centers):
+        Phi = np.zeros((X.shape[0], centers.shape[0]))
+        for p in range(X.shape[0]):
+            for j in range(centers.shape[0]):
+                Dpj = np.linalg.norm(X[p] - centers[j])
+                Phi[p, j] = (Dpj ** 2) * np.log(Dpj) if Dpj > 0 else 0.0
+        return np.nan_to_num(Phi, nan=0.0)
 
-        for r in self.tv_sim_results.get_children():
-            self.tv_sim_results.delete(r)
-        Yd = np.atleast_2d(self.Y_sim)[:, 0]
-        Yr = np.atleast_2d(Yr_sim)[:, 0]
-        for i in range(len(Yd)):
-            err = Yd[i] - Yr[i]
-            self.tv_sim_results.insert("", "end", values=(i + 1, f"{Yr[i]:.6f}", f"{Yd[i]:.6f}", f"{err:.6f}"))
+     def build_A(Phi): return np.hstack([np.ones((Phi.shape[0], 1)), Phi])
+     def predict(A, W): return A @ W
+     def metricas(Yd, Yr):
+        N = len(Yd); err = Yd - Yr
+        EG = np.sum(np.abs(err))/N
+        MAE = np.mean(np.abs(err))
+        RMSE = np.sqrt(np.mean(err**2))
+        return EG, MAE, RMSE, err
 
-        for r in self.tv_metrics.get_children():
-            self.tv_metrics.delete(r)
-        conv_train = "Sí" if met_train["EG"] <= float(self.error_opt.get()) else "No"
-        conv_sim = "Sí" if met_sim["EG"] <= float(self.error_opt.get()) else "No"
+     # --- Simulación ---
+     Phi_sim = compute_phi(self.X_sim, self.centers)
+     A_sim = build_A(Phi_sim)
+     Yr_sim = predict(A_sim, self.weights)
+     EGs, MAEs, RMSEs, Err_sim = metricas(self.Y_sim, Yr_sim)
 
-        self.tv_metrics.insert("", "end", values=("Entrenamiento", f"{met_train['EG']:.6f}", f"{met_train['MAE']:.6f}", f"{met_train['RMSE']:.6f}", conv_train))
-        self.tv_metrics.insert("", "end", values=("Simulación", f"{met_sim['EG']:.6f}", f"{met_sim['MAE']:.6f}", f"{met_sim['RMSE']:.6f}", conv_sim))
+     # --- Métricas de entrenamiento para comparación ---
+     Phi_train = compute_phi(self.X_train, self.centers)
+     A_train = build_A(Phi_train)
+     Yr_train = predict(A_train, self.weights)
+     EGt, MAEt, RMSEt, _ = metricas(self.Y_train, Yr_train)
 
-        self.log("Simulación ejecutada correctamente.")   
+     # Limpiar tablas
+     for t in (self.tv_sim_results, self.tv_metrics):
+        t.delete(*t.get_children())
+
+     # Llenar resultados simulación
+     for i in range(len(self.Y_sim)):
+        self.tv_sim_results.insert("", "end", values=(i+1, f"{Yr_sim[i][0]:.6f}", f"{self.Y_sim[i][0]:.6f}", f"{Err_sim[i][0]:.6f}"))
+
+     # Llenar métricas
+     self.tv_metrics.insert("", "end", values=("Entrenamiento", f"{EGt:.6f}", f"{MAEt:.6f}", f"{RMSEt:.6f}", "Sí" if EGt <= float(self.error_opt.get()) else "No"))
+     self.tv_metrics.insert("", "end", values=("Simulación", f"{EGs:.6f}", f"{MAEs:.6f}", f"{RMSEs:.6f}", "Sí" if EGs <= float(self.error_opt.get()) else "No"))
+
+     # Actualizar tabla de parámetros usados
+     self.update_sim_params_table()
+     messagebox.showinfo("Simulación completada", "Simulación ejecutada correctamente.")
+     self.log("✅ Simulación ejecutada correctamente con los datos del entrenamiento.")
+
+     
+    def cargar_pesos_umbral(self):
+     """Permite al usuario cargar pesos, umbral y centros previamente guardados y mostrarlos en tabla."""
+     import json
+
+     folder = filedialog.askdirectory(title="Selecciona la carpeta del modelo a cargar")
+     if not folder:
+        return
+
+     centros_path = os.path.join(folder, "centros.npy")
+     pesos_path = os.path.join(folder, "pesos.npy")
+     umbral_path = os.path.join(folder, "umbral.json")
+
+     if not (os.path.exists(centros_path) and os.path.exists(pesos_path) and os.path.exists(umbral_path)):
+        messagebox.showerror(
+            "Error",
+            "La carpeta seleccionada no contiene archivos válidos (centros.npy, pesos.npy, umbral.json)."
+        )
+        return
+
+     try:
+        # Cargar los datos
+        self.centers = np.load(centros_path)
+        self.weights = np.load(pesos_path)
+
+        with open(umbral_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            self.error_opt.set(float(data.get("umbral", 0.1)))
+
+        # Mostrar en la tabla
+        for r in self.tv_loaded.get_children():
+            self.tv_loaded.delete(r)
+
+        self.tv_loaded.insert("", "end", values=("W0 (Umbral)", f"{self.error_opt.get():.6f}"))
+
+        # Pesos
+        if self.weights.ndim == 2:
+            pesos_flat = self.weights.flatten()
+        else:
+            pesos_flat = self.weights
+
+        for i, w in enumerate(pesos_flat):
+            self.tv_loaded.insert("", "end", values=(f"W{i+1}", f"{float(w):.6f}"))
+
+        # Centros
+        for j, c in enumerate(self.centers, start=1):
+            c_str = ", ".join([f"{float(v):.6f}" for v in c])
+            self.tv_loaded.insert("", "end", values=(f"C{j}", c_str))
+
+        # Actualizar configuración interna (por si se desea simular de inmediato)
+        self.n_centers.set(self.centers.shape[0])
+
+        self.log(f"✅ Pesos, umbral y centros cargados desde {folder}")
+        messagebox.showinfo("Carga completada", f"Modelo cargado correctamente desde:\n{folder}")
+
+     except Exception as e:
+        messagebox.showerror("Error", f"No se pudieron cargar los archivos:\n{e}")
+        self.log(f"❌ Error cargando modelo: {e}")
+ 
+
+     # --- FUNCIONES RBF SEGÚN FORMULAS DEL PROFESOR ---
+     def compute_phi(X, centers):
+        Phi = np.zeros((X.shape[0], centers.shape[0]))
+        for p in range(X.shape[0]):
+            for j in range(centers.shape[0]):
+                Dpj = np.linalg.norm(X[p] - centers[j])
+                Phi[p, j] = (Dpj ** 2) * np.log(Dpj) if Dpj > 0 else 0.0
+        return np.nan_to_num(Phi, nan=0.0)
+
+     def build_A(Phi):
+        ones = np.ones((Phi.shape[0], 1))
+        return np.hstack([ones, Phi])
+
+     def predict(A, W):
+        return A @ W
+
+     def calcular_metricas(Yd, Yr):
+        N = len(Yd)
+        errores = Yd - Yr
+        EG = np.sum(np.abs(errores)) / N
+        MAE = np.mean(np.abs(errores))
+        RMSE = np.sqrt(np.mean(errores ** 2))
+        return EG, MAE, RMSE, errores
+
+     # --- Simulación ---
+     Phi_sim = compute_phi(self.X_sim, self.centers)
+     A_sim = build_A(Phi_sim)
+     Yr_sim = predict(A_sim, self.weights)
+
+     # --- Métricas simulación ---
+     EG_sim, MAE_sim, RMSE_sim, Err_sim = calcular_metricas(self.Y_sim, Yr_sim)
+     conv_sim = "Sí" if EG_sim <= float(self.error_opt.get()) else "No"
+
+     # --- Métricas entrenamiento ---
+     Phi_train = compute_phi(self.X_train, self.centers)
+     A_train = build_A(Phi_train)
+     Yr_train = predict(A_train, self.weights)
+     EG_train, MAE_train, RMSE_train, _ = calcular_metricas(self.Y_train, Yr_train)
+     conv_train = "Sí" if EG_train <= float(self.error_opt.get()) else "No"
+
+    # --- Mostrar tabla de simulación ---
+     for r in self.tv_sim_results.get_children():
+        self.tv_sim_results.delete(r)
+     for i in range(len(self.Y_sim)):
+        self.tv_sim_results.insert("", "end", values=(i + 1, f"{Yr_sim[i][0]:.6f}", f"{self.Y_sim[i][0]:.6f}", f"{Err_sim[i][0]:.6f}"))
+
+     # --- Tabla de métricas (entrenamiento y simulación) ---
+     for r in self.tv_metrics.get_children():
+      self.tv_metrics.delete(r)
+     self.tv_metrics.insert("", "end", values=("Entrenamiento", f"{EG_train:.6f}", f"{MAE_train:.6f}", f"{RMSE_train:.6f}", conv_train))
+     self.tv_metrics.insert("", "end", values=("Simulación", f"{EG_sim:.6f}", f"{MAE_sim:.6f}", f"{RMSE_sim:.6f}", conv_sim))
+
+     self.log(f"Simulación ejecutada.\nEntrenamiento: EG={EG_train:.6f}, MAE={MAE_train:.6f}, RMSE={RMSE_train:.6f}\n"
+             f"Simulación: EG={EG_sim:.6f}, MAE={MAE_sim:.6f}, RMSE={RMSE_sim:.6f}")
+
 
     def load_simulated_csv(self):
      path = filedialog.askopenfilename(title="Selecciona el archivo CSV de simulación", filetypes=[("CSV", "*.csv"), ("All", "*.*")])
@@ -713,111 +1022,179 @@ class RBFApp(tk.Tk):
         ttk.Button(f, text="Guardar Gráficas", command=self.save_plots).pack(anchor="nw", padx=6)
 
     def generate_plots(self):
-     if self.weights is None or self.centers is None:
-        messagebox.showwarning("Sin modelo", "Entrena o carga un modelo primero.")
-        return
-     if self.X_train is None or self.Y_train is None:
-        messagebox.showwarning("Sin datos", "No hay datos de entrenamiento cargados.")
-        return
-     Phi_train = rbf_core.compute_phi(self.X_train, self.centers)
-     A_train = rbf_core.build_A(Phi_train)
-     Yr_train = rbf_core.predict(A_train, self.weights)
-     Yd_train = np.atleast_2d(self.Y_train)[:, 0]
-     Yr_train_1 = np.atleast_2d(Yr_train)[:, 0]
+        if self.weights is None or self.centers is None:
+            messagebox.showwarning("Sin modelo", "Entrena o carga un modelo primero.")
+            return
+        if self.X_train is None or self.Y_train is None:
+            messagebox.showwarning("Sin datos", "No hay datos de entrenamiento cargados.")
+            return
 
-     met_train = metrics_mod.metrics(self.Y_train, Yr_train)
+        # --- FUNCIONES RBF SEGÚN FORMULAS DEL PROFESOR ---
+        def compute_phi(X, centers):
+            Phi = np.zeros((X.shape[0], centers.shape[0]))
+            for p in range(X.shape[0]):
+                for j in range(centers.shape[0]):
+                    Dpj = np.linalg.norm(X[p] - centers[j])
+                    if Dpj > 0:
+                        Phi[p, j] = (Dpj ** 2) * np.log(Dpj)
+                    else:
+                        Phi[p, j] = 0.0
+            return np.nan_to_num(Phi, nan=0.0)
 
-     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-     plt.subplots_adjust(wspace=0.3)
+        def build_A(Phi):
+            ones = np.ones((Phi.shape[0], 1))
+            return np.hstack([ones, Phi])
 
-     axes[0].plot(range(1, len(Yd_train) + 1), Yd_train, marker='o', label='YD (Deseado)')
-     axes[0].plot(range(1, len(Yr_train_1) + 1), Yr_train_1, marker='x', linestyle='--', label='YR (Red)')
-     axes[0].set_title("YD vs YR (Entrenamiento)")
-     axes[0].set_xlabel("Patrón")
-     axes[0].set_ylabel("Valor de salida")
-     axes[0].legend()
-     axes[0].grid(True)
+        def predict(A, W):
+            return A @ W
 
-     axes[1].plot([1], [met_train["EG"]], marker='o', markersize=10, label=f"EG = {met_train['EG']:.4f}")
-     axes[1].axhline(y=float(self.error_opt.get()), color='r', linestyle='--', label=f"Error óptimo = {float(self.error_opt.get())}")
-     axes[1].set_title("EG vs Error óptimo (Entrenamiento)")
-     axes[1].set_xticks([1])
-     axes[1].set_xticklabels(["Iteración 1"])
-     axes[1].set_ylabel("Error")
-     axes[1].legend()
-     axes[1].grid(True)
+        def calcular_metricas(Yd, Yr):
+            N = len(Yd)
+            errores = Yd - Yr
+            EG = np.sum(np.abs(errores)) / N
+            MAE = np.mean(np.abs(errores))
+            RMSE = np.sqrt(np.mean(errores ** 2))
+            return EG, MAE, RMSE, errores
 
-     errors = np.abs(Yd_train - Yr_train_1)
-     axes[2].bar(range(1, len(errors) + 1), errors)
-     axes[2].set_title("Error por Patrón (Entrenamiento)")
-     axes[2].set_xlabel("Patrón")
-     axes[2].set_ylabel("|YD - YR|")
-     axes[2].grid(axis='y')
+        # --- Calcular datos del entrenamiento ---
+        Phi_train = compute_phi(self.X_train, self.centers)
+        A_train = build_A(Phi_train)
+        Yr_train = predict(A_train, self.weights)
+        Yd_train = self.Y_train
 
-     plt.suptitle("Gráficas del Entrenamiento RBF", fontsize=14)
-     plt.show()
+        EG, MAE, RMSE, errores = calcular_metricas(Yd_train, Yr_train)
+        patrones = np.arange(1, len(Yd_train) + 1)
 
+        # --- GRAFICAR ---
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        plt.subplots_adjust(wspace=0.3)
+        plt.suptitle("Gráficas del Entrenamiento RBF", fontsize=14)
+
+        # 🔹 1. YD vs YR
+        axes[0].plot(patrones, Yd_train, 'o-', label='YD (Deseado)')
+        axes[0].plot(patrones, Yr_train, 'x--', label='YR (Red)')
+        axes[0].set_title("YD vs YR (Entrenamiento)")
+        axes[0].set_xlabel("Patrón")
+        axes[0].set_ylabel("Valor de salida")
+        axes[0].legend()
+        axes[0].grid(True)
+
+        # 🔹 2. EG vs Error óptimo
+        axes[1].plot([1], [EG], 'bo', markersize=8, label=f"EG = {EG:.4f}")
+        axes[1].axhline(y=float(self.error_opt.get()), color='r', linestyle='--', label=f"Error óptimo = {float(self.error_opt.get())}")
+        axes[1].set_title("EG vs Error óptimo (Entrenamiento)")
+        axes[1].set_xlabel("Iteración 1")
+        axes[1].set_ylabel("Error")
+        axes[1].legend()
+        axes[1].grid(True)
+
+        # 🔹 3. Error por patrón
+        axes[2].bar(patrones, np.abs(errores).flatten())
+        axes[2].set_title("Error por Patrón (Entrenamiento)")
+        axes[2].set_xlabel("Patrón")
+        axes[2].set_ylabel("|YD - YR|")
+        axes[2].grid(axis="y")
+
+        plt.show()
+
+        self.log(f"Gráficas generadas correctamente. EG={EG:.6f}, MAE={MAE:.6f}, RMSE={RMSE:.6f}")
 
     def save_plots(self):
-     if self.weights is None or self.centers is None:
-        messagebox.showwarning("Sin modelo", "Entrena o carga un modelo primero.")
-        return
-     if self.X_train is None or self.Y_train is None:
-        messagebox.showwarning("Sin datos", "No hay datos de entrenamiento.")
-        return
+        if self.weights is None or self.centers is None:
+            messagebox.showwarning("Sin modelo", "Entrena o carga un modelo primero.")
+            return
+        if self.X_train is None or self.Y_train is None:
+            messagebox.showwarning("Sin datos", "No hay datos de entrenamiento cargados.")
+            return
 
-     folder = filedialog.askdirectory(title="Selecciona carpeta para guardar las gráficas")
-     if not folder:
-        return
+        # --- FUNCIONES RBF SEGÚN FORMULAS DEL PROFESOR ---
+        def compute_phi(X, centers):
+            Phi = np.zeros((X.shape[0], centers.shape[0]))
+            for p in range(X.shape[0]):
+                for j in range(centers.shape[0]):
+                    Dpj = np.linalg.norm(X[p] - centers[j])
+                    if Dpj > 0:
+                        Phi[p, j] = (Dpj ** 2) * np.log(Dpj)
+                    else:
+                        Phi[p, j] = 0.0
+            return np.nan_to_num(Phi, nan=0.0)
 
-     name = simpledialog.askstring("Nombre base", "Nombre base para las gráficas (sin extensión):")
-     if not name:
-        name = pd.Timestamp.now().strftime("trainplots_%Y%m%d_%H%M%S")
+        def build_A(Phi):
+            ones = np.ones((Phi.shape[0], 1))
+            return np.hstack([ones, Phi])
 
-     Phi_train = rbf_core.compute_phi(self.X_train, self.centers)
-     A_train = rbf_core.build_A(Phi_train)
-     Yr_train = rbf_core.predict(A_train, self.weights)
-     Yd_train = np.atleast_2d(self.Y_train)[:, 0]
-     Yr_train_1 = np.atleast_2d(Yr_train)[:, 0]
-     met_train = metrics_mod.metrics(self.Y_train, Yr_train)
-     errors = np.abs(Yd_train - Yr_train_1)
+        def predict(A, W):
+            return A @ W
 
-     fig1 = plt.figure(figsize=(8, 6))
-     plt.plot(range(1, len(Yd_train) + 1), Yd_train, marker='o', label='YD (Deseado)')
-     plt.plot(range(1, len(Yr_train_1) + 1), Yr_train_1, marker='x', linestyle='--', label='YR (Red)')
-     plt.title("YD vs YR (Entrenamiento)")
-     plt.xlabel("Patrón")
-     plt.ylabel("Valor de salida")
-     plt.legend()
-     plt.grid(True)
-     path1 = os.path.join(folder, f"{name}_Yd_vs_Yr.png")
-     plt.savefig(path1, bbox_inches="tight")
-     plt.close(fig1)
+        def calcular_metricas(Yd, Yr):
+            N = len(Yd)
+            errores = Yd - Yr
+            EG = np.sum(np.abs(errores)) / N
+            MAE = np.mean(np.abs(errores))
+            RMSE = np.sqrt(np.mean(errores ** 2))
+            return EG, MAE, RMSE, errores
 
-     fig2 = plt.figure(figsize=(6, 6))
-     plt.plot([1], [met_train["EG"]], marker='o', markersize=10, label=f"EG = {met_train['EG']:.4f}")
-     plt.axhline(y=float(self.error_opt.get()), color='r', linestyle='--', label=f"Error óptimo = {float(self.error_opt.get())}")
-     plt.title("EG vs Error óptimo (Entrenamiento)")
-     plt.xticks([1], ["Iteración 1"])
-     plt.ylabel("Error")
-     plt.legend()
-     plt.grid(True)
-     path2 = os.path.join(folder, f"{name}_EG_vs_opt.png")
-     plt.savefig(path2, bbox_inches="tight")
-     plt.close(fig2)
+        # --- Calcular datos del entrenamiento ---
+        Phi_train = compute_phi(self.X_train, self.centers)
+        A_train = build_A(Phi_train)
+        Yr_train = predict(A_train, self.weights)
+        Yd_train = self.Y_train
 
-     fig3 = plt.figure(figsize=(8, 6))
-     plt.bar(range(1, len(errors) + 1), errors)
-     plt.title("Error por Patrón (Entrenamiento)")
-     plt.xlabel("Patrón")
-     plt.ylabel("|YD - YR|")
-     plt.grid(axis='y')
-     path3 = os.path.join(folder, f"{name}_Error_por_Patron.png")
-     plt.savefig(path3, bbox_inches="tight")
-     plt.close(fig3)
+        EG, MAE, RMSE, errores = calcular_metricas(Yd_train, Yr_train)
+        patrones = np.arange(1, len(Yd_train) + 1)
 
-     messagebox.showinfo("Guardado", f"Gráficas guardadas en:\n{folder}")
-     self.log(f"Gráficas de entrenamiento guardadas como {name}_*.png en {folder}")
+        # --- Generar figura ---
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        plt.subplots_adjust(wspace=0.3)
+        plt.suptitle("Gráficas del Entrenamiento RBF", fontsize=14)
+
+        # 🔹 1. YD vs YR
+        axes[0].plot(patrones, Yd_train, 'o-', label='YD (Deseado)')
+        axes[0].plot(patrones, Yr_train, 'x--', label='YR (Red)')
+        axes[0].set_title("YD vs YR (Entrenamiento)")
+        axes[0].set_xlabel("Patrón")
+        axes[0].set_ylabel("Valor de salida")
+        axes[0].legend()
+        axes[0].grid(True)
+
+        # 🔹 2. EG vs Error óptimo
+        axes[1].plot([1], [EG], 'bo', markersize=8, label=f"EG = {EG:.4f}")
+        axes[1].axhline(y=float(self.error_opt.get()), color='r', linestyle='--',
+                        label=f"Error óptimo = {float(self.error_opt.get())}")
+        axes[1].set_title("EG vs Error óptimo (Entrenamiento)")
+        axes[1].set_xlabel("Iteración 1")
+        axes[1].set_ylabel("Error")
+        axes[1].legend()
+        axes[1].grid(True)
+
+        # 🔹 3. Error por patrón
+        axes[2].bar(patrones, np.abs(errores).flatten())
+        axes[2].set_title("Error por Patrón (Entrenamiento)")
+        axes[2].set_xlabel("Patrón")
+        axes[2].set_ylabel("|YD - YR|")
+        axes[2].grid(axis="y")
+
+        # --- Guardar localmente (con selector de ruta) ---
+        try:
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".png",
+                filetypes=[("Imagen PNG", "*.png"), ("Archivo PDF", "*.pdf"), ("Todos los archivos", "*.*")],
+                title="Guardar gráfica del entrenamiento como..."
+            )
+            if not file_path:
+                messagebox.showinfo("Cancelado", "Guardado cancelado por el usuario.")
+                plt.close(fig)
+                return
+
+            fig.savefig(file_path, bbox_inches='tight')
+            plt.close(fig)
+            self.log(f"Gráficas guardadas correctamente en: {file_path}")
+            messagebox.showinfo("Éxito", f"Gráficas guardadas en:\n{file_path}")
+
+        except Exception as e:
+            self.log(f"Error al guardar gráficas: {e}")
+            messagebox.showerror("Error", f"No se pudieron guardar las gráficas:\n{e}")
+
 
     def reset_all(self):
         if messagebox.askyesno("Confirmar", "¿Deseas limpiar todo? Asegúrate de haber guardado tus datos y modelos."):
@@ -841,7 +1218,10 @@ class RBFApp(tk.Tk):
             self.dataset_status_lbl.config(text="Dataset: No cargado")
             self.dataset_info_lbl.config(text="Entradas: 0 | Salidas: 0 | Patrones: 0")
             self.train_state_lbl.config(text="Estado: No iniciado")
-
+            # Limpiar también la tabla de pesos/umbral cargados
+        if hasattr(self, "tv_loaded"):
+            for k in self.tv_loaded.get_children():
+             self.tv_loaded.delete(k)
             self.log("Estado limpiado. Todo listo para empezar de nuevo.")
             messagebox.showinfo("Listo", "El sistema se limpió correctamente.")
 

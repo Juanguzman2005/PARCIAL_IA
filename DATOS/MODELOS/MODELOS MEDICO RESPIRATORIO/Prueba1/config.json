@@ -1,0 +1,17 @@
+{
+    "nombre": "Prueba1",
+    "n_centers": 4,
+    "error_opt": 0.1,
+    "meta": {
+        "X_cols": [
+            "Frecuencia_Respiratoria_rpm",
+            "Saturacion_Oxigeno_%",
+            "Frecuencia_Cardiaca_lpm",
+            "Temperatura_Corporal_C"
+        ],
+        "Y_cols": [
+            "Flujo_Espiratorio_Ls"
+        ]
+    },
+    "fecha_guardado": "2025-10-30T01:16:05.055398"
+}

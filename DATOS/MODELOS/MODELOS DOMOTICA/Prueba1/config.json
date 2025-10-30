@@ -1,0 +1,17 @@
+{
+    "nombre": "Prueba1",
+    "n_centers": 4,
+    "error_opt": 0.1,
+    "meta": {
+        "X_cols": [
+            "Luminosidad_Lux",
+            "Temperatura_Ambiente_C",
+            "Humedad_Ambiente_%",
+            "Consumo_Electrico_W"
+        ],
+        "Y_cols": [
+            "Sensor_Movimiento"
+        ]
+    },
+    "fecha_guardado": "2025-10-30T01:13:10.816645"
+}

@@ -1,14 +1,8 @@
 [
     {
-        "name": "simulacion1",
-        "csv": "simulacion1.csv",
-        "metrics": "simulacion1_metrics.json",
-        "saved_at": "2025-10-26T14:29:06.227467"
-    },
-    {
-        "name": "simulacion2",
-        "csv": "simulacion2.csv",
-        "metrics": "simulacion2_metrics.json",
-        "saved_at": "2025-10-26T15:02:26.904335"
+        "name": "Prueba1",
+        "csv": "Prueba1.csv",
+        "metrics": "Prueba1_metrics.json",
+        "saved_at": "2025-10-30T01:14:07.119990"
     }
 ]
